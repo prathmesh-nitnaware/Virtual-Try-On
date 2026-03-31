@@ -1,0 +1,333 @@
+Virtual Try-On Project
+Complete Project Plan & Technical Roadmap
+Estimated total: 10–12 weeks  ·  Full-body webcam scan → 3D avatar → garment draping
+Project Overview
+This document outlines the complete technical plan for building a browser-based virtual try-on system. The core user flow is:
+User signs in via authenticated session
+User performs a guided webcam full-body scan
+System generates a personalised 3D avatar using SMPL-X parametric body modelling
+User uploads a flat-lay T-shirt image
+System processes the garment and drapes it realistically on the 3D avatar in Three.js
+Architecture Overview
+The project uses a split backend architecture — Node.js/Express handles all app logic and user data, while a separate FastAPI (Python) service handles all computer vision processing. MediaPipe runs directly in the browser via WASM, eliminating server round-trips for the pose estimation step.
+Layer
+Technology
+Responsibility
+Frontend
+React + Three.js + MediaPipe WASM
+UI, 3D rendering, in-browser pose estimation
+App Backend
+Node.js / Express + Prisma
+Auth, user data, avatar records, garment metadata
+CV Backend
+FastAPI + Python + OpenCV
+SMPL-X mesh generation, garment segmentation, UV mapping
+Database
+PostgreSQL via Prisma
+Users, avatars, garments, try-on sessions
+Storage
+AWS S3 / Cloudflare R2
+Mesh .glb files, garment textures, scan frames
+Deployment
+Vercel + GPU instance + CDN
+Frontend hosting, CV inference, asset delivery
+Timeline Summary
+#
+Phase
+Estimate
+Key Output
+1
+Auth & Project Foundation
+~1 week
+Auth flow + DB schema
+2
+Webcam Body Scan Pipeline
+~2 weeks
+Body measurements extracted
+3
+3D Avatar Generation
+~2-3 weeks
+Personalised 3D avatar
+4
+Garment Upload & Processing
+~1.5 weeks
+UV texture asset ready
+5
+Try-on Engine (Cloth Draping)
+~2-3 weeks
+Garment on avatar in 3D
+6
+Polish, Performance & Ship
+~1 week
+Live deployed product
+Detailed Phase Breakdown
+Phase 1 · Auth & Project Foundation
+~1 week
+Set up the monorepo, authentication flows, and user session management. Since Stusil already has JWT infrastructure, many patterns can be reused here directly.
+Tasks
+Task
+Details
+User auth
+Register / login / JWT session. Store user profile and avatar reference in PostgreSQL via Prisma. Reuse Stusil auth middleware where possible.
+Project scaffold
+Monorepo: /frontend (React + Three.js) and /backend (FastAPI for CV, Node/Express for app logic). Docker-compose for local development.
+DB schema
+Tables: users, avatars (body measurements, mesh path, pose data), garments (image URL, segmented mask, metadata), try-on sessions.
+Cloud storage
+S3/R2 buckets for raw webcam frames, processed meshes (.glb), garment images, and segmented masks. Signed URL pattern for secure uploads.
+Tech Stack
+Node.js / Express
+Prisma + PostgreSQL
+JWT
+AWS S3 / R2
+Docker
+Deliverable: User can sign up, log in, and reach a dashboard. Auth-protected routes ready for avatar and garment data.
+Phase 2 · Webcam Body Scan Pipeline
+~2 weeks
+Capture body keypoints and measurements from a live webcam feed. This is the most familiar domain — the HackaNova virtual try-on work with OpenCV and body detection maps directly onto this phase.
+Tasks
+Task
+Details
+Pose estimation
+Use MediaPipe Pose (browser-side) to extract 33 body landmarks in real-time. Runs via WASM in-browser — zero latency, no server round-trip required.
+Measurement extraction
+Front + side view captures. Compute shoulder width, torso length, hip width, and arm length from landmark distances with user-provided height as reference.
+Guided scan UI
+Step-by-step webcam UI: stand straight → arms out → turn 90°. Show skeleton overlay in real-time. Auto-capture frame when pose confidence passes threshold.
+Data persistence
+Send extracted landmark and measurement data to backend. Store in PostgreSQL. Upload reference frames to S3. Associate all data with the user's avatar record.
+Tech Stack
+MediaPipe Pose
+WebRTC / getUserMedia
+Canvas API
+FastAPI (Python)
+OpenCV
+Deliverable: User completes a guided scan. App captures front and side frames, extracts body measurements, and stores them. Skeleton overlay confirms detection accuracy.
+Phase 3 · 3D Avatar Generation
+~2–3 weeks
+Convert body measurements into a rigged, animatable 3D mesh that renders in Three.js. This is the most technically complex phase of the entire project.
+Tasks
+Task
+Details
+Base mesh approach
+Use the SMPL-X parametric body model. Feed body measurements into shape parameters (β) to generate a posed, gendered mesh. Export as .glb. Avoids building mesh geometry from scratch.
+Shape fitting
+Map extracted measurements (shoulder width, height, hip circumference) to SMPL-X β parameters. Python service on the backend. Return .glb file stored in S3.
+Three.js renderer
+Load .glb via GLTFLoader. Set up OrbitControls for 360° inspection. HDR environment lighting. SkinnedMesh renderer for eventual cloth deformation support.
+Avatar customisation
+Let user adjust skin tone, hair style, and face from presets. Sliders to fine-tune body shape (±10% on measurements). Saves updated β params and re-generates mesh on demand.
+Tech Stack
+SMPL / SMPL-X
+Three.js
+GLTFLoader
+Python (smplx lib)
+Blender (optional)
+Deliverable: User sees their personalised 3D avatar in the browser, rotatable 360°. Avatar proportions reflect actual body measurements from the scan.
+Phase 4 · Garment Upload & Processing
+~1.5 weeks
+Accept a flat T-shirt image from the user and process it into a UV-ready texture that can be draped onto the 3D avatar mesh.
+Tasks
+Task
+Details
+Image upload
+Drag-and-drop upload UI. Send to S3. Accept front-facing flat-lay or mannequin photos. Guide the user toward good inputs: white background, fully visible garment.
+Garment segmentation
+Use SAM (Segment Anything Model) or a clothing-specific model such as U2NET-clothes to extract the garment mask and remove the background. Store mask and UV-ready image.
+Texture extraction
+Unwrap the segmented garment into a UV texture map. Preserve print, colour, and pattern details. This becomes the material applied to the 3D cloth mesh.
+Garment metadata
+Classify garment type (T-shirt, hoodie, jacket). Detect dominant colour and pattern type. Store in PostgreSQL for filtering. Auto-tag with AI classification where possible.
+Tech Stack
+SAM / U2NET
+Rembg (bg removal)
+OpenCV
+FastAPI
+PIL / Pillow
+Deliverable: User uploads a T-shirt photo. System segments it, removes background, extracts UV texture, and stores a processed garment asset ready for draping.
+Phase 5 · Try-on Engine (Cloth Draping)
+~2–3 weeks
+The core product feature: draping the processed garment texture onto the 3D avatar mesh correctly, scaled to the user's proportions with realistic visual fit.
+Tasks
+Task
+Details
+Cloth mesh creation
+Generate a T-shirt mesh scaled to the avatar's body measurements. Use a template garment mesh (rigged T-shirt .glb) and deform it using the avatar's SMPL-X shape parameters.
+Texture mapping
+Apply the extracted UV texture map onto the cloth mesh. Handle front and back panels separately. Preserve scale of prints and logos relative to garment dimensions.
+Cloth simulation
+Use Cannon.js or Ammo.js for lightweight cloth physics in Three.js — wrinkles, drape around shoulders. Alternatively use pre-baked deformation for better performance on mobile.
+Fit feedback
+Show size indicators (Fits well / Tight / Loose) based on avatar measurements vs. garment's labelled size. Visual colour overlay on tight or loose areas as a heatmap.
+Tech Stack
+Three.js SkinnedMesh
+Cannon.js / Ammo.js
+GLSL shaders
+UV mapping
+Deliverable: Avatar wears the uploaded T-shirt in 3D. Garment fits the avatar's proportions. User can rotate 360° and see realistic cloth drape.
+Phase 6 · Polish, Performance & Ship
+~1 week
+UX polish, performance optimisation, and preparing the full product for deployment end to end.
+Tasks
+Task
+Details
+Wardrobe feature
+Save try-on sessions. User builds a wardrobe of garments. Quick-switch between items on the same avatar. Optional: side-by-side comparison view.
+Performance
+LOD (level of detail) for the avatar mesh. Compress .glb with Draco. Lazy-load textures. Target 60fps on mid-range devices. WASM for CV processing in the browser.
+Screenshot / share
+Render Three.js canvas to PNG. Let user download or share a try-on screenshot. Optional stretch goal: AR mode via WebXR for real-world overlay.
+Deployment
+Frontend on Vercel. Python CV backend on a GPU instance (Render, Railway, or AWS EC2). PostgreSQL on Supabase or RDS. CDN via CloudFront for mesh and texture assets.
+Tech Stack
+Vercel
+Draco compression
+WebXR (optional)
+Supabase
+CloudFront CDN
+Deliverable: Live, deployed product. Full flow working: body scan → 3D avatar → garment upload → try-on. Shareable screenshots. Production-ready infrastructure.
+Key Technical Decisions
+Three architectural choices deserve special attention before development begins:
+1. Body-to-3D Conversion: SMPL-X vs. Photogrammetry
+The SMPL-X parametric body model is the recommended path. It takes body measurements and outputs a properly rigged mesh via a Python library. Photogrammetry from webcam frames is far more complex, prone to quality degradation in poor lighting, and requires significantly more compute. SMPL-X delivers consistent, production-quality avatars with minimal implementation risk.
+2. Cloth Simulation: Physics vs. Pre-baked Deformation
+Full physics simulation using Cannon.js or Ammo.js looks realistic but can drop below 30fps on mid-range mobile devices. A practical middle ground is pre-computed cloth deformation: deform the garment mesh based on avatar measurements at rest, without real-time physics. This gives 80% of the visual quality at a fraction of the compute cost — recommended for v1.
+3. Split Backend Architecture
+Separating Node.js (app logic) from FastAPI (CV processing) is the right call. The Node.js backend handles auth, user data, and session management — reusing patterns from Stusil. The FastAPI service handles SMPL-X mesh generation and garment segmentation, where Python's ML ecosystem is far richer. MediaPipe running entirely in-browser via WASM eliminates the server round-trip for pose estimation entirely.
+Database Schema (Prisma)
+The five core models required for the full try-on flow:
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  avatar    Avatar?
+  garments  Garment[]
+  sessions  TryOnSession[]
+}
+
+model Avatar {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  height       Float
+  shoulderWidth Float
+  torsoLength  Float
+  hipWidth     Float
+  betaParams   Json
+  meshUrl      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Garment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  type        String
+  imageUrl    String
+  maskUrl     String
+  textureUrl  String
+  dominantColor String?
+  createdAt   DateTime @default(now())
+  sessions    TryOnSession[]
+}
+
+model TryOnSession {
+  id          String   @id @default(cuid())
+  userId      String
+  garmentId   String
+  user        User     @relation(fields: [userId], references: [id])
+  garment     Garment  @relation(fields: [garmentId], references: [id])
+  screenshotUrl String?
+  fitResult   String?
+  createdAt   DateTime @default(now())
+}
+Technical Gaps to Address
+The six-phase plan covers the core flow but leaves several technical areas unaddressed. These should be planned before or during development to avoid costly rework later.
+Multi-Garment Layering
+The current plan handles one garment at a time. Stacking a T-shirt under a jacket requires layering cloth meshes with proper z-ordering and collision response between them. The cloth mesh architecture in Phase 5 should be designed with layering in mind from the start — retrofitting it later is significantly harder.
+Lighting Adaptation
+Garments should respond to ambient lighting conditions in the Three.js scene. Without it, the same red T-shirt looks identical under noon sunlight and a warm indoor lamp — breaking immersion. Add an environment lighting system using HDR maps, and expose a simple scene lighting toggle (daylight, indoor, studio) in the UI.
+Garment Template Registry
+Phase 5 currently assumes a single T-shirt mesh template. As you expand to hoodies, jackets, and trousers, each garment type needs its own base mesh with appropriate rigging. Build a template registry early: a catalogue of pre-rigged garment meshes keyed by type, each with defined UV seams and deformation zones. This makes Phase 5 scalable with minimal rework.
+Task
+Details
+Layering system
+Design cloth mesh stack with z-ordering. Handle mesh collision between layered garments. Define render order in Three.js scene graph.
+Lighting system
+HDR environment map loading. Scene lighting presets (daylight, indoor, studio). Garment material responds to scene light intensity and colour temperature.
+Template registry
+Pre-rigged mesh templates per garment type (T-shirt, hoodie, jacket, trousers). Each template stores UV seam definitions and deformation zone metadata.
+Missing User Flows
+Two user journeys are absent from the current plan but will be requested early by users.
+Avatar Re-scan & Versioning
+Users will want to redo their scan after body changes. The system needs a re-scan flow that creates a new avatar version without deleting the old one. Avatar versioning lets users maintain a history and switch between body states. The schema should store versioned avatar records linked to the same user rather than overwriting.
+Size Recommendation Engine
+The fit feedback system in Phase 5 already computes whether a garment is tight or loose relative to the avatar. Exposing this as a 'What size should I order?' feature requires one additional step: mapping avatar measurements against a garment's size chart (S/M/L/XL with chest and length ranges). This is low implementation effort once the fit logic exists and adds immediate, tangible value.
+Task
+Details
+Re-scan flow
+UI to initiate a new body scan. Creates a versioned avatar record (v1, v2...). User can switch active avatar version. Old try-on sessions retain their avatar snapshot.
+Size recommendation
+Garment upload includes size chart (per-size chest/length ranges). Fit engine maps avatar measurements against size chart. Surfaces recommended size with confidence indicator.
+Manual measurement input
+Fallback path if webcam scan fails or user declines camera access. User enters height, chest, waist, hip manually. System generates avatar from typed measurements.
+Security & Privacy
+Webcam and body scan data is sensitive biometric PII. These requirements should be implemented in Phase 1, not added later — retrofitting privacy controls is risky and time-consuming.
+Task
+Details
+Data retention policy
+Raw webcam scan frames must be deleted from S3 within 24 hours of measurement extraction. Only the derived measurement values are retained long-term. Document this policy explicitly in the privacy policy.
+Right to erasure
+Implement a 'Delete my account' flow that hard-deletes: user record, all avatar versions and meshes, all garment assets, all try-on sessions, and all S3 objects. Required for GDPR compliance.
+Biometric data consent
+Show an explicit consent screen before the webcam scan begins. Log consent timestamp and version to the database. Do not proceed without confirmed consent. Store consent separately from the user record.
+Secure asset access
+All S3 mesh and texture URLs must be pre-signed with short expiry (15 min). Never expose public S3 bucket URLs. Avatar .glb files are personal data and must not be publicly accessible.
+HTTPS + CORS
+Enforce HTTPS on all endpoints. Strict CORS policy on the FastAPI CV service — only accept requests from the frontend origin. Sanitise all file uploads (type check, size limit, malware scan).
+Error Handling & Resilience
+The CV pipeline has several failure points that need defined fallback behaviour. Without these, a single bad lighting condition or network timeout results in a broken user experience with no recovery path.
+Task
+Details
+Pose detection failure
+If MediaPipe confidence falls below threshold after 10 seconds, surface a 'Try again' prompt with tips: better lighting, stand further back, remove baggy clothing. Offer manual measurement input as fallback.
+Mesh generation timeout
+SMPL-X generation on the backend may take 5-15 seconds. Show a progress indicator. If the request times out (>30s), retry once automatically. On second failure, show an error with a retry button.
+Garment segmentation failure
+If SAM/U2NET cannot isolate the garment (complex background, low contrast), return a partial result with a warning. Let the user manually crop the garment region as a fallback.
+WebGL / Three.js failure
+If WebGL is unavailable or the device lacks sufficient GPU memory, detect at startup and show a graceful message. Offer a 2D flat try-on fallback (composite the garment onto a static avatar image).
+Queue & retry system
+Wrap all CV backend jobs (mesh generation, garment segmentation) in a job queue (BullMQ or similar). Jobs that fail are retried up to 3 times with exponential backoff. Failed jobs are logged for debugging.
+Analytics & Feedback Loop
+Without instrumentation, you have no signal on where the product breaks down or which features drive engagement. These events should be tracked from day one.
+Core Event Funnel
+Track every step of the primary user journey to identify drop-off points:
+scan_started — user opens the webcam scan modal
+scan_completed — body measurements successfully extracted
+avatar_viewed — user views their generated 3D avatar
+avatar_adjusted — user modifies body shape sliders
+garment_uploaded — user uploads a garment image
+tryon_viewed — try-on render displayed successfully
+screenshot_taken — user saves or shares a try-on screenshot
+size_recommendation_viewed — user views a size recommendation
+Quality Signals
+Capture signals that reveal model and render quality issues:
+scan_retried — user redid their scan (indicates poor first result)
+segmentation_fallback_used — SAM failed, user manually cropped garment
+avatar_rescan_requested — user triggered a re-scan (body change or dissatisfaction)
+webgl_fallback_triggered — device could not run Three.js renderer
+Task
+Details
+Event tracking
+Integrate PostHog or Mixpanel (both have generous free tiers). Fire events server-side for backend actions (mesh generation, segmentation) and client-side for UI interactions.
+Funnel dashboard
+Build a simple funnel view: scan_started -> scan_completed -> avatar_viewed -> tryon_viewed. Conversion rate between each step surfaces where users drop off.
+Error rate monitoring
+Track CV pipeline error rates (pose detection failures, mesh timeouts, segmentation failures) as metrics. Alert if any error rate exceeds 5% over a 1-hour window.
+Performance monitoring
+Log Three.js frame rate (fps) and mesh load time per device. Segment by device type to identify performance problems on specific hardware tiers.
+Virtual Try-On Project Plan · Generated with Claude · Total estimate: 10-12 weeks

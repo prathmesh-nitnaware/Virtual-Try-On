@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: vtryon
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app-backend:
+    build:
+      context: ./backend/app
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://admin:password@db:5432/vtryon
+      - PORT=4000
+    depends_on:
+      - db
+
+  cv-backend:
+    build:
+      context: ./backend/cv
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+
+volumes:
+  postgres_data:

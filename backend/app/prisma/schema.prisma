@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  avatar    Avatar?
+  garments  Garment[]
+  sessions  TryOnSession[]
+}
+
+model Avatar {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  height       Float
+  shoulderWidth Float
+  torsoLength  Float
+  hipWidth     Float
+  betaParams   Json
+  meshUrl      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Garment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  type        String
+  imageUrl    String
+  maskUrl     String
+  textureUrl  String
+  dominantColor String?
+  createdAt   DateTime @default(now())
+  sessions    TryOnSession[]
+}
+
+model TryOnSession {
+  id          String   @id @default(cuid())
+  userId      String
+  garmentId   String
+  user        User     @relation(fields: [userId], references: [id])
+  garment     Garment  @relation(fields: [garmentId], references: [id])
+  screenshotUrl String?
+  fitResult   String?
+  createdAt   DateTime @default(now())
+}
