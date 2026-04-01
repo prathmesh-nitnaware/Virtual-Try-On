@@ -4,3 +4,5 @@ opencv-python-headless==4.9.0.80
 pydantic==2.6.4
 numpy==1.26.4
 Pillow==10.3.0
+rembg==2.0.53
+python-multipart==0.0.9
