@@ -1,0 +1,29 @@
+# Datasets and models
+data/
+deep_fashion_3d_point_cloud/
+ml/models/
+*.pt
+*.pth
+*.h5
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Node
+node_modules/
+dist/
+build/
+.npm/
+
+# OS
+.DS_Store
+Thumbs.db
