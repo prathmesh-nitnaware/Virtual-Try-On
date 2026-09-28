@@ -1,4 +1,4 @@
-# 👗 V-TryOn — Real-Time AR & Neural Virtual Try-On Platform
+# 👕 V-TryOn — Real-Time AR & Neural T-Shirt Virtual Try-On Platform
 
 <div align="center">
 
@@ -12,7 +12,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
-**An enterprise-grade, dual-engine Virtual Try-On platform delivering ultra-low-latency real-time AR fitting alongside photorealistic 2D/3D deep-learning neural garment draping.**
+**An enterprise-grade, dual-engine Virtual Try-On platform delivering ultra-low-latency real-time AR T-shirt fitting alongside photorealistic 2D/3D deep-learning neural garment draping.**
 
 [Overview](#-overview) • [Portfolio Highlights](#-portfolio--resume-highlights) • [Architecture](#-system-architecture) • [Features](#-key-features) • [Tech Stack](#-technology-stack) • [Quickstart](#-getting-started) • [API Docs](#-api-reference) • [Roadmap](#-roadmap--milestones) • [Resume Bullet Points](#-resume-bullet-points)
 
